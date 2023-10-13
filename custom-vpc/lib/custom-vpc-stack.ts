@@ -147,5 +147,42 @@ export class CustomVpcStack extends cdk.Stack {
     //   destinationCidrBlock: '0.0.0.0/0',
     //   natGatewayId: natGateway.ref
     // });
+
+
+    // Security Group
+    const webAccessSecurityGroup = new ec2.CfnSecurityGroup(this, 'WebAccessSecurityGroup', {
+      vpcId: vpc.ref,
+      groupDescription: 'Web Access Security Group',
+      securityGroupEgress: [
+        {
+          description: 'Outbound access',
+          cidrIp: '0.0.0.0/0',
+          ipProtocol: '-1', // allow all traffic on all protocols
+        },
+      ],
+      securityGroupIngress: [
+        {
+          description: 'SSH Inbound Rule',
+          cidrIp: '0.0.0.0/0', // change this to your ip address for enhanced security
+          ipProtocol: 'tcp',
+          fromPort: 22, 
+          toPort: 22
+        },
+        {
+          description: 'HTTP inbound rule',
+          cidrIp: '0.0.0.0/0', 
+          ipProtocol: 'tcp',
+          fromPort: 80, 
+          toPort: 80
+        },
+      ],
+      tags: [{
+        key: 'Name',
+        value: 'WebAccessSecurityGroup'
+      }]
+    })
+
+    
+
   }
 }
