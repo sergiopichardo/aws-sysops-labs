@@ -182,7 +182,48 @@ export class CustomVpcStack extends cdk.Stack {
       }]
     })
 
-    
+    const amazonLinuxAmi2 = ec2.MachineImage.latestAmazonLinux2();
+
+    // Create an EC2 instance 
+    const ec2Instance = new ec2.CfnInstance(this, 'CustomInstance', {
+      instanceType: 't2.micro',
+      imageId: amazonLinuxAmi2.getImage(this).imageId,
+      keyName: process.env.KEY_PAIR_NAME as string,
+      networkInterfaces: [
+        {
+          associatePublicIpAddress: true,
+          deviceIndex: '0',
+          groupSet: [webAccessSecurityGroup.ref],
+          subnetId: publicSubnet1A.ref
+        }
+      ],
+      tags: [{
+        key: 'Name',
+        value: 'MyEc2Instance'
+      }]
+    });
+
+    // NOTE: run `sudo lsblk -e7` to list the volumes in the EC2 instance
+    // Newer Linux kernel may rename your devices to `/dev/xvdf` through
+    // `/dev/xvdp` internally, even when the device name entered here 
+    // (and shown in the details) is `/dev/sdf` through `dev/sdp`
+    const ebsVolume = new ec2.CfnVolume(this, 'EBSVolume', {
+      volumeType: 'gp2',
+      availabilityZone: 'us-east-1a',
+      size: 16,
+      tags: [{
+        key: 'Name',
+        value: 'test-volume-1'
+      }]
+    });
+
+    new ec2.CfnVolumeAttachment(this, 'EBSVolumeAttachment', {
+      volumeId: ebsVolume.ref,
+      instanceId: ec2Instance.ref,
+      device: '/dev/sdh'
+    });
+
+
 
   }
 }
