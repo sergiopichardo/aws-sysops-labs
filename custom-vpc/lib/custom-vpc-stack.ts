@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as efs from 'aws-cdk-lib/aws-efs';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as rds from 'aws-cdk-lib/aws-rds';
 
 export class CustomVpcStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -40,6 +41,17 @@ export class CustomVpcStack extends cdk.Stack {
       tags: [{
         key: 'Name',
         value: 'Public-1B'
+      }]
+    });
+
+    const publicSubnet1C = new ec2.CfnSubnet(this, 'Public-1C', {
+      cidrBlock: '10.0.5.0/24', 
+      vpcId: vpc.ref,
+      mapPublicIpOnLaunch: true,
+      availabilityZone: 'us-east-1c', 
+      tags: [{
+        key: 'Name',
+        value: 'Public-1C'
       }]
     });
 
@@ -230,123 +242,181 @@ export class CustomVpcStack extends cdk.Stack {
      * Elastic File Sytem
      ***************************************************************
      */
-    const efsSecurityGroup = new ec2.CfnSecurityGroup(this, 'FileSystemSecurityGroup', {
-      tags: [{ key: 'Name', value: 'EFS Security Group'}],
+    // const efsSecurityGroup = new ec2.CfnSecurityGroup(this, 'FileSystemSecurityGroup', {
+    //   tags: [{ key: 'Name', value: 'EFS Security Group'}],
+    //   vpcId: vpc.ref,
+    //   groupDescription: 'File System Security Group',
+    //   securityGroupIngress: [
+    //     {
+    //       description: 'NFS Inbound rule',
+    //       cidrIp: '0.0.0.0/0', // change this to your ip address for enhanced security
+    //       ipProtocol: 'tcp',
+    //       fromPort: 2049, 
+    //       toPort: 2049
+    //     },
+    //     {
+    //       description: 'SSH Inbound Rule',
+    //       cidrIp: '0.0.0.0/0', // change this to your ip address for enhanced security
+    //       ipProtocol: 'tcp',
+    //       fromPort: 22, 
+    //       toPort: 22
+    //     },
+    //   ],
+    //   securityGroupEgress: [
+    //     {
+    //       description: 'Outbound access',
+    //       cidrIp: '0.0.0.0/0',
+    //       ipProtocol: '-1', // allow all traffic on all protocols
+    //     },
+    //   ] 
+    // })
+
+    // const ec2InstanceEFS = new ec2.CfnInstance(this, 'EFSLabEC2Instance', {
+    //   instanceType: 't2.micro',
+    //   imageId: amazonLinuxAmi2.getImage(this).imageId,
+    //   keyName: process.env.KEY_PAIR_NAME as string,
+    //   networkInterfaces: [
+    //     {
+    //       associatePublicIpAddress: true,
+    //       deviceIndex: '0', // primary network interface
+    //       groupSet: [efsSecurityGroup.ref],
+    //       subnetId: publicSubnet1A.ref
+    //     }
+    //   ],
+    //   tags: [{
+    //     key: 'Name',
+    //     value: 'EFSLabEC2Instnace'
+    //   }]
+    // });
+
+    // // Enforce in-transit encryption for all clients
+    // const myFileSystemPolicy = new iam.PolicyDocument({
+    //   statements: [
+    //     new iam.PolicyStatement({
+    //       effect: iam.Effect.ALLOW,
+    //       principals: [new iam.AccountRootPrincipal()],
+    //       actions: [
+    //         'elasticfilesystem:ClientRootAccess',
+    //         'elasticfilesystem:ClientWrite',
+    //         'elasticfilesystem:ClientMount',
+    //       ],
+    //       conditions: {
+    //         Bool: {
+    //           'elasticfilesystem:AccessedViaMountTarget': 'true',
+    //         },
+    //       },
+    //     }),
+    //     new iam.PolicyStatement({
+    //       effect: iam.Effect.DENY,
+    //       principals: [new iam.AccountRootPrincipal()],
+    //       actions: ["*"],
+    //       conditions: {
+    //         Bool: {
+    //           'aws:SecureTransport': 'false',
+    //         },
+    //       },
+    //     }),
+    //   ],
+    // });
+    
+
+    // // NOTE: Launch EFS without specifying the AZ 
+    // const fileSystem = new efs.CfnFileSystem(this, 'ElasticFileSystem', {
+    //   fileSystemTags: [{ key: 'Name', value: 'ElasticFileSystem'}],
+    //   encrypted: true,
+    //   backupPolicy: {
+    //     status: 'ENABLED',
+    //   },
+    //   lifecyclePolicies: [
+    //     {
+    //       transitionToIa: efs.LifecyclePolicy.AFTER_30_DAYS,
+    //     }
+    //   ],
+    //   fileSystemPolicy: myFileSystemPolicy
+    // });
+
+
+    // new efs.CfnAccessPoint(this, 'AccessPoint', {
+    //   fileSystemId: fileSystem.ref,
+    // });
+
+    // // // Mount Target public AZ A
+    // new efs.CfnMountTarget(this, 'MountTargetPublic1A', {
+    //   fileSystemId: fileSystem.ref,
+    //   subnetId: publicSubnet1A.ref,
+    //   securityGroups: [
+    //     efsSecurityGroup.ref
+    //   ]
+    // });
+
+    // // Mount Target public AZ B
+    // new efs.CfnMountTarget(this, 'MountTargetPublic1B', {
+    //   fileSystemId: fileSystem.ref,
+    //   subnetId: publicSubnet1B.ref,
+    //   securityGroups: [
+    //     efsSecurityGroup.ref
+    //   ]
+    // });
+
+    /*
+     ***************************************************************
+     * Relational Database Service (RDS)
+     ***************************************************************
+     */
+    const rdsSecurityGroup = new ec2.CfnSecurityGroup(this, 'RDSSecurityGroup', {
       vpcId: vpc.ref,
-      groupDescription: 'File System Security Group',
-      securityGroupIngress: [
-        {
-          description: 'NFS Inbound rule',
-          cidrIp: '0.0.0.0/0', // change this to your ip address for enhanced security
-          ipProtocol: 'tcp',
-          fromPort: 2049, 
-          toPort: 2049
-        },
-        {
-          description: 'SSH Inbound Rule',
-          cidrIp: '0.0.0.0/0', // change this to your ip address for enhanced security
-          ipProtocol: 'tcp',
-          fromPort: 22, 
-          toPort: 22
-        },
-      ],
+      groupDescription: 'RDS Security Group',
       securityGroupEgress: [
         {
           description: 'Outbound access',
           cidrIp: '0.0.0.0/0',
           ipProtocol: '-1', // allow all traffic on all protocols
         },
-      ] 
-    })
-
-    const ec2InstanceEFS = new ec2.CfnInstance(this, 'EFSLabEC2Instance', {
-      instanceType: 't2.micro',
-      imageId: amazonLinuxAmi2.getImage(this).imageId,
-      keyName: process.env.KEY_PAIR_NAME as string,
-      networkInterfaces: [
+      ],
+      securityGroupIngress: [
         {
-          associatePublicIpAddress: true,
-          deviceIndex: '0', // primary network interface
-          groupSet: [efsSecurityGroup.ref],
-          subnetId: publicSubnet1A.ref
-        }
+          description: 'RDS access',
+          cidrIp: '0.0.0.0/0', 
+          ipProtocol: 'tcp',
+          fromPort: 3306, 
+          toPort: 3306,
+        },
       ],
       tags: [{
         key: 'Name',
-        value: 'EFSLabEC2Instnace'
+        value: 'RDSSecurityGROUP'
       }]
-    });
+    })
 
-    // Enforce in-transit encryption for all clients
-    const myFileSystemPolicy = new iam.PolicyDocument({
-      statements: [
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          principals: [new iam.AccountRootPrincipal()],
-          actions: [
-            'elasticfilesystem:ClientRootAccess',
-            'elasticfilesystem:ClientWrite',
-            'elasticfilesystem:ClientMount',
-          ],
-          conditions: {
-            Bool: {
-              'elasticfilesystem:AccessedViaMountTarget': 'true',
-            },
-          },
-        }),
-        new iam.PolicyStatement({
-          effect: iam.Effect.DENY,
-          principals: [new iam.AccountRootPrincipal()],
-          actions: ["*"],
-          conditions: {
-            Bool: {
-              'aws:SecureTransport': 'false',
-            },
-          },
-        }),
+
+    const rdsSubnet = new rds.CfnDBSubnetGroup(this, 'RDSSubnet', {
+      dbSubnetGroupName: 'RDSSubnet',
+      dbSubnetGroupDescription: 'RDS Subnet',
+      subnetIds: [
+        // WARNING: At least 3 subnets must be provided when running on multi-az mode
+        // multi-az is configured by default 
+        publicSubnet1A.ref,
+        publicSubnet1B.ref,
+        publicSubnet1C.ref,
       ],
+      tags: [{ key: 'Name', value: 'RDSSubnet'}],
+    })
+  
+
+    const rdsInstance = new rds.CfnDBCluster(this, 'MyDatabase', {
+      engine: 'mysql',
+      engineVersion: '8.0',
+      databaseName: 'sampledb',
+      masterUsername: 'admin',
+      masterUserPassword: 'password123', // for testing purposes only
+      dbClusterInstanceClass: 'db.m5d.large',
+      storageType: 'io1',
+      iops: 1000,
+      allocatedStorage: 100,
+      publiclyAccessible: true,
+      vpcSecurityGroupIds: [rdsSecurityGroup.ref],
+      dbSubnetGroupName: rdsSubnet.dbSubnetGroupName,
     });
-    
-
-    // NOTE: Launch EFS without specifying the AZ 
-    const fileSystem = new efs.CfnFileSystem(this, 'ElasticFileSystem', {
-      fileSystemTags: [{ key: 'Name', value: 'ElasticFileSystem'}],
-      encrypted: true,
-      backupPolicy: {
-        status: 'ENABLED',
-      },
-      lifecyclePolicies: [
-        {
-          transitionToIa: efs.LifecyclePolicy.AFTER_30_DAYS,
-        }
-      ],
-      fileSystemPolicy: myFileSystemPolicy
-    });
-
-
-    new efs.CfnAccessPoint(this, 'AccessPoint', {
-      fileSystemId: fileSystem.ref,
-    });
-
-    // // Mount Target public AZ A
-    new efs.CfnMountTarget(this, 'MountTargetPublic1A', {
-      fileSystemId: fileSystem.ref,
-      subnetId: publicSubnet1A.ref,
-      securityGroups: [
-        efsSecurityGroup.ref
-      ]
-    });
-
-    // Mount Target public AZ B
-    new efs.CfnMountTarget(this, 'MountTargetPublic1B', {
-      fileSystemId: fileSystem.ref,
-      subnetId: publicSubnet1B.ref,
-      securityGroups: [
-        efsSecurityGroup.ref
-      ]
-    });
-
-    
 
 
 
